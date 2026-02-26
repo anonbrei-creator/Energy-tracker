@@ -1609,7 +1609,7 @@ function renderAverages() {
     const avgPredicted = entries.reduce((s, e) => s + e.predictedCost, 0) / entries.length;
     const avgActual = entries.reduce((s, e) => s + e.actualCost, 0) / entries.length;
     const avgGap = avgPredicted - avgActual;
-    const gapColor = avgGap > 0 ? 'var(--accent)' : avgGap < 0 ? 'var(--danger)' : 'var(--text-dim)';
+    const gapColor = avgGap > 0 ? 'var(--accent2)' : avgGap < 0 ? 'var(--danger)' : 'var(--text-dim)';
 
     return `<div class="avg-row">
       <span class="avg-task">${name} <span style="color:var(--text-dimmer);font-size:10px">(${entries.length}x)</span></span>
