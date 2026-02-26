@@ -649,6 +649,68 @@
     from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: translateY(0); }
   }
+
+  /* Home cards */
+  .home-card {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+  }
+
+  .home-card:hover { border-color: var(--accent); transform: translateX(4px); }
+
+  .home-card-icon { font-size: 24px; flex-shrink: 0; }
+
+  .home-card-text { flex: 1; }
+
+  .home-card-title {
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    font-weight: 300;
+    font-style: italic;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+
+  .home-card-sub {
+    font-size: 11px;
+    color: var(--text-dimmer);
+    letter-spacing: 0.04em;
+  }
+
+  .home-card-arrow {
+    color: var(--text-dimmer);
+    font-size: 18px;
+    transition: color 0.2s;
+  }
+
+  .home-card:hover .home-card-arrow { color: var(--accent); }
+
+  /* Back button */
+  .back-btn {
+    background: none;
+    border: none;
+    color: var(--text-dimmer);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    padding: 0;
+    margin-bottom: 20px;
+    display: block;
+    transition: color 0.2s;
+    text-transform: uppercase;
+  }
+
+  .back-btn:hover { color: var(--accent); }
 </style>
 </head>
 <body>
@@ -663,25 +725,59 @@
     <div class="date-badge" id="dateBadge"></div>
   </div>
 
-  <!-- Nav -->
-  <div class="nav">
-    <button class="nav-btn active" onclick="showTab('track')">Track</button>
-    <button class="nav-btn" onclick="showTab('history')">History</button>
-    <button class="nav-btn" onclick="showTab('averages')">Averages</button>
+  <!-- HOME SCREEN -->
+  <div id="screen-home" class="fade-in">
+    <div style="display:flex;flex-direction:column;gap:12px;margin-top:8px">
+      <button class="home-card" onclick="goToTrack()">
+        <div class="home-card-icon">⚡</div>
+        <div class="home-card-text">
+          <div class="home-card-title">Track</div>
+          <div class="home-card-sub">Log tasks, run the timer, see your cost</div>
+        </div>
+        <div class="home-card-arrow">→</div>
+      </button>
+      <button class="home-card" onclick="showScreen('history');renderHistory()">
+        <div class="home-card-icon">📋</div>
+        <div class="home-card-text">
+          <div class="home-card-title">History</div>
+          <div class="home-card-sub">Every task you've logged</div>
+        </div>
+        <div class="home-card-arrow">→</div>
+      </button>
+      <button class="home-card" onclick="showScreen('averages');renderAverages()">
+        <div class="home-card-icon">📊</div>
+        <div class="home-card-text">
+          <div class="home-card-title">Averages</div>
+          <div class="home-card-sub">Predicted vs actual over time</div>
+        </div>
+        <div class="home-card-arrow">→</div>
+      </button>
+    </div>
   </div>
 
-  <!-- TRACK TAB -->
-  <div id="tab-track">
+  <!-- TRACK SCREEN -->
+  <div id="screen-track" style="display:none">
+    <button class="back-btn" onclick="showScreen('home')">← Home</button>
+
+    <!-- Day choice -->
+    <div id="dayChoiceSection" class="setup-card fade-in">
+      <h2>What would you like to do?</h2>
+      <p>Continue where you left off or start fresh for a new day.</p>
+      <div class="toggle-group" style="margin-bottom:0">
+        <button class="toggle-btn" onclick="handleNewDay()">New Day</button>
+        <button class="toggle-btn" onclick="handleContinueDay()">Continue Day</button>
+      </div>
+    </div>
 
     <!-- Day Setup -->
-    <div id="setupSection" class="setup-card fade-in">
+    <div id="setupSection" class="setup-card fade-in" style="display:none">
       <h2>Start your day</h2>
       <p>Set your baseline before logging any tasks. This calibrates your energy calculations.</p>
 
       <div class="question">
         <label>Are you experiencing extenuating circumstances?</label>
         <div class="toggle-group">
-          <button class="toggle-btn" id="btn-no" onclick="setCircumstance(false)">No — Starting at 100</button>
+          <button class="toggle-btn active" id="btn-no" onclick="setCircumstance(false)">No — Starting at 100</button>
           <button class="toggle-btn" id="btn-yes" onclick="setCircumstance(true)">Yes — Starting at 95</button>
         </div>
       </div>
@@ -776,17 +872,18 @@
         </div>
       </div>
     </div>
-
   </div>
 
-  <!-- HISTORY TAB -->
-  <div id="tab-history" style="display:none">
+  <!-- HISTORY SCREEN -->
+  <div id="screen-history" style="display:none">
+    <button class="back-btn" onclick="showScreen('home')">← Home</button>
     <div class="section-label">Task History</div>
     <div id="historyList"></div>
   </div>
 
-  <!-- AVERAGES TAB -->
-  <div id="tab-averages" style="display:none">
+  <!-- AVERAGES SCREEN -->
+  <div id="screen-averages" style="display:none">
+    <button class="back-btn" onclick="showScreen('home')">← Home</button>
     <div class="section-label">Per-Task Averages</div>
     <div class="averages-card">
       <h3>Predicted vs. Actual Cost</h3>
@@ -803,6 +900,15 @@
     <button class="btn btn-danger btn-full" onclick="clearAllData()" style="margin-top:8px">Clear All Data</button>
   </div>
 
+</div>
+
+<!-- Modal overlay -->
+<div id="modalOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:50;display:none;align-items:center;justify-content:center;padding:24px">
+  <div id="modalBox" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;max-width:400px;width:100%">
+    <div id="modalTitle" style="font-family:'Fraunces',serif;font-size:18px;font-weight:300;font-style:italic;margin-bottom:8px"></div>
+    <div id="modalBody" style="font-size:12px;color:var(--text-dim);margin-bottom:20px;line-height:1.6"></div>
+    <div id="modalButtons" style="display:flex;gap:8px"></div>
+  </div>
 </div>
 
 <!-- Notification -->
@@ -892,20 +998,125 @@ function clearAllData() {
 // =====================
 window.onload = function() {
   updateDateBadge();
-  const resumed = loadState();
-  if (resumed && state.dayStarted) {
-    showDayActive();
-    // Recalculate passive drain from now
-    recalcEnergy();
-    startPassiveDrain();
-    if (state.activeTask) {
-      renderActiveTask();
+  loadState();
+  showScreen('home');
+  updateTaskSuggestions();
+};
+
+// =====================
+// SCREEN NAVIGATION
+// =====================
+function showScreen(name) {
+  ['home','track','history','averages'].forEach(s => {
+    document.getElementById('screen-' + s).style.display = s === name ? 'block' : 'none';
+  });
+}
+
+function goToTrack() {
+  showScreen('track');
+  // If day is already active for today, skip choice and go straight to tracker
+  if (state.dayStarted && state.dayStartTime) {
+    const savedDate = new Date(state.dayStartTime).toDateString();
+    const today = new Date().toDateString();
+    if (savedDate === today) {
+      showDayChoice(false);
+      showDayActive();
+      recalcEnergy();
+      startPassiveDrain();
+      if (state.activeTask) renderActiveTask();
+      return;
     }
   }
-  updateTaskSuggestions();
-  renderHistory();
-  renderAverages();
-};
+  // Otherwise show choice
+  showDayChoice(true);
+}
+
+function showDayChoice(show) {
+  document.getElementById('dayChoiceSection').style.display = show ? 'block' : 'none';
+  document.getElementById('setupSection').style.display = 'none';
+  document.getElementById('energySection').style.display = 'none';
+}
+
+function handleNewDay() {
+  showModal(
+    'Start a new day?',
+    'Any progress tracked today will be reset. Your full history and averages are kept.',
+    [
+      { label: "Yes, new day", style: 'btn-primary', action: () => { closeModal(); resetDayState(); showSetup(); } },
+      { label: "Cancel", style: 'btn-secondary', action: closeModal }
+    ]
+  );
+}
+
+function handleContinueDay() {
+  const history = getHistory();
+  const today = new Date().toDateString();
+  const todayEntries = history.filter(h => new Date(h.timestamp).toDateString() === today);
+
+  if (todayEntries.length === 0 && !state.dayStarted) {
+    const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+    showModal(
+      'No data logged today',
+      `Nothing has been logged for ${dateStr}. Redirecting to New Day setup...`,
+      [{ label: "OK", style: 'btn-primary', action: () => { closeModal(); resetDayState(); showSetup(); } }]
+    );
+    return;
+  }
+
+  // Has data or active day — continue
+  closeModal();
+  showDayChoice(false);
+  showDayActive();
+  recalcEnergy();
+  startPassiveDrain();
+  if (state.activeTask) renderActiveTask();
+}
+
+function showSetup() {
+  document.getElementById('dayChoiceSection').style.display = 'none';
+  document.getElementById('setupSection').style.display = 'block';
+  document.getElementById('energySection').style.display = 'none';
+}
+
+function resetDayState() {
+  if (state.passiveDrainInterval) clearInterval(state.passiveDrainInterval);
+  if (state.timerInterval) clearInterval(state.timerInterval);
+  state.dayStarted = false;
+  state.extenuating = false;
+  state.startMode = 'now';
+  state.startEnergy = 100;
+  state.dayStartTime = null;
+  state.currentEnergy = 100;
+  state.tasksCompleted = 0;
+  state.activeTask = null;
+  state.timerInterval = null;
+  state.passiveDrainInterval = null;
+  saveState();
+}
+
+// =====================
+// MODAL
+// =====================
+function showModal(title, body, buttons) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalBody').textContent = body;
+  const btnContainer = document.getElementById('modalButtons');
+  btnContainer.innerHTML = '';
+  buttons.forEach(b => {
+    const btn = document.createElement('button');
+    btn.className = 'btn ' + b.style;
+    btn.style.flex = '1';
+    btn.textContent = b.label;
+    btn.onclick = b.action;
+    btnContainer.appendChild(btn);
+  });
+  const overlay = document.getElementById('modalOverlay');
+  overlay.style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').style.display = 'none';
+}
 
 function updateDateBadge() {
   const now = new Date();
@@ -1418,17 +1629,11 @@ function renderAverages() {
 }
 
 // =====================
-// TABS
+// TABS (legacy redirect)
 // =====================
 function showTab(tab) {
-  ['track', 'history', 'averages'].forEach(t => {
-    document.getElementById('tab-' + t).style.display = t === tab ? 'block' : 'none';
-  });
-  document.querySelectorAll('.nav-btn').forEach((btn, i) => {
-    btn.classList.toggle('active', ['track','history','averages'][i] === tab);
-  });
-  if (tab === 'history') renderHistory();
-  if (tab === 'averages') renderAverages();
+  if (tab === 'history') { showScreen('history'); renderHistory(); }
+  if (tab === 'averages') { showScreen('averages'); renderAverages(); }
 }
 
 // =====================
