@@ -899,6 +899,15 @@
       The gap between predicted and actual is your brain recalibrating.<br>Watch it shrink over time.
     </div>
     <button class="btn btn-danger btn-full" onclick="clearAllData()" style="margin-top:8px">Clear All Data</button>
+    
+    <div class="divider"></div>
+    <div class="section-label" style="margin-top:0">Data Backup</div>
+    <div style="font-size:11px;color:var(--text-dimmer);margin-bottom:12px;line-height:1.6">Export your data to back it up or move it to a new device. Import to restore.</div>
+    <div class="btn-row" style="margin-top:0">
+      <button class="btn btn-secondary" style="flex:1" onclick="exportData()">⬇ Export Data</button>
+      <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('importFile').click()">⬆ Import Data</button>
+    </div>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
   </div>
 
 </div>
@@ -1621,6 +1630,72 @@ function renderAverages() {
 function showTab(tab) {
   if (tab === 'history') { showScreen('history'); renderHistory(); }
   if (tab === 'averages') { showScreen('averages'); renderAverages(); }
+}
+
+// =====================
+// EXPORT / IMPORT
+// =====================
+function exportData() {
+  const data = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    history: getHistory(),
+    tasks: getSavedTasks(),
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'field-tracker-backup-' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showNotification('Data exported — save that file somewhere safe');
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.history || !Array.isArray(data.history)) {
+        showNotification('Invalid file — import failed');
+        return;
+      }
+      showModal(
+        'Import data?',
+        `This will merge ${data.history.length} entries with your existing data. Your current data won't be deleted.`,
+        [
+          { label: 'Import', style: 'btn-primary', action: () => {
+            // Merge history (avoid duplicates by timestamp)
+            const existing = getHistory();
+            const existingTimestamps = new Set(existing.map(e => e.timestamp));
+            const newEntries = data.history.filter(e => !existingTimestamps.has(e.timestamp));
+            const merged = [...existing, ...newEntries].sort((a,b) => b.timestamp - a.timestamp);
+            localStorage.setItem('fieldtracker_history', JSON.stringify(merged));
+            // Merge saved tasks
+            if (data.tasks) {
+              const existingTasks = getSavedTasks();
+              const mergedTasks = [...new Set([...existingTasks, ...data.tasks])];
+              localStorage.setItem('fieldtracker_tasks', JSON.stringify(mergedTasks));
+            }
+            closeModal();
+            renderHistory();
+            renderAverages();
+            updateTaskSuggestions();
+            showNotification(`Imported ${newEntries.length} new entries`);
+          }},
+          { label: 'Cancel', style: 'btn-secondary', action: closeModal }
+        ]
+      );
+    } catch(err) {
+      showNotification('Could not read file — import failed');
+    }
+    // Reset file input so same file can be imported again if needed
+    event.target.value = '';
+  };
+  reader.readAsText(file);
 }
 
 // =====================
