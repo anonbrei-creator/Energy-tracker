@@ -1,0 +1,1394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Field Energy Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0e0e10;
+    --surface: #16161a;
+    --surface2: #1e1e24;
+    --border: #2a2a35;
+    --accent: #c8f075;
+    --accent2: #75c8f0;
+    --warn: #f0a875;
+    --danger: #f07575;
+    --text: #e8e8ee;
+    --text-dim: #888896;
+    --text-dimmer: #55555f;
+    --radius: 12px;
+    --radius-sm: 6px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    padding: 0;
+    overflow-x: hidden;
+  }
+
+  /* Background texture */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: 
+      radial-gradient(ellipse at 20% 20%, rgba(200,240,117,0.04) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 80%, rgba(117,200,240,0.04) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 24px 16px 80px;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 32px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .header-left h1 {
+    font-family: 'Fraunces', serif;
+    font-size: 28px;
+    font-weight: 300;
+    font-style: italic;
+    color: var(--text);
+    line-height: 1.1;
+  }
+
+  .header-left p {
+    font-size: 11px;
+    color: var(--text-dimmer);
+    margin-top: 4px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .date-badge {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-align: right;
+    line-height: 1.6;
+  }
+
+  /* Energy bar */
+  .energy-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+
+  .energy-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 12px;
+  }
+
+  .energy-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-dimmer);
+  }
+
+  .energy-value {
+    font-family: 'Fraunces', serif;
+    font-size: 48px;
+    font-weight: 300;
+    line-height: 1;
+    transition: color 0.5s;
+  }
+
+  .energy-bar-track {
+    height: 6px;
+    background: var(--surface2);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+
+  .energy-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.8s cubic-bezier(0.4,0,0.2,1), background 0.5s;
+  }
+
+  .energy-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--text-dimmer);
+  }
+
+  /* Drain indicator */
+  .drain-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 10px;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+  }
+
+  .drain-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--warn);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* Setup card */
+  .setup-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+
+  .setup-card h2 {
+    font-family: 'Fraunces', serif;
+    font-size: 18px;
+    font-weight: 300;
+    font-style: italic;
+    margin-bottom: 6px;
+  }
+
+  .setup-card p {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-bottom: 20px;
+    line-height: 1.6;
+  }
+
+  .question {
+    margin-bottom: 20px;
+  }
+
+  .question label {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dimmer);
+    margin-bottom: 8px;
+  }
+
+  .toggle-group {
+    display: flex;
+    gap: 8px;
+  }
+
+  .toggle-btn {
+    flex: 1;
+    padding: 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-dim);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.05em;
+  }
+
+  .toggle-btn:hover { border-color: var(--text-dimmer); color: var(--text); }
+  .toggle-btn.active { background: var(--accent); border-color: var(--accent); color: #0e0e10; }
+  .toggle-btn.active-warn { background: var(--warn); border-color: var(--warn); color: #0e0e10; }
+
+  /* Section label */
+  .section-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-dimmer);
+    margin-bottom: 12px;
+    margin-top: 28px;
+  }
+
+  /* Task form */
+  .task-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 12px;
+  }
+
+  .task-card.active-task {
+    border-color: var(--accent2);
+    box-shadow: 0 0 0 1px var(--accent2), 0 0 20px rgba(117,200,240,0.08);
+  }
+
+  input[type="text"], select, textarea {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    padding: 10px 12px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  input[type="text"]:focus, select:focus, textarea:focus {
+    border-color: var(--accent);
+  }
+
+  select option { background: var(--surface2); }
+
+  textarea { resize: vertical; min-height: 60px; }
+
+  .input-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .input-row input { flex: 1; margin-bottom: 0; }
+
+  /* Slider */
+  .slider-group {
+    margin-bottom: 16px;
+  }
+
+  .slider-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 6px;
+  }
+
+  .slider-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dimmer);
+  }
+
+  .slider-value {
+    font-size: 20px;
+    font-family: 'Fraunces', serif;
+    font-weight: 300;
+    color: var(--accent);
+  }
+
+  .slider-sublabel {
+    font-size: 10px;
+    color: var(--text-dimmer);
+    margin-left: 4px;
+  }
+
+  input[type="range"] {
+    width: 100%;
+    -webkit-appearance: none;
+    height: 4px;
+    background: var(--surface2);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    transition: transform 0.2s;
+  }
+
+  input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.3); }
+
+  /* Timer display */
+  .timer-display {
+    text-align: center;
+    padding: 20px;
+    background: var(--surface2);
+    border-radius: var(--radius-sm);
+    margin: 16px 0;
+  }
+
+  .timer-digits {
+    font-family: 'Fraunces', serif;
+    font-size: 52px;
+    font-weight: 300;
+    color: var(--accent2);
+    letter-spacing: 0.05em;
+    line-height: 1;
+  }
+
+  .timer-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-dimmer);
+    margin-top: 6px;
+  }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 18px;
+    border-radius: var(--radius-sm);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #0e0e10;
+    border-color: var(--accent);
+  }
+  .btn-primary:hover { opacity: 0.85; transform: translateY(-1px); }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--text-dim);
+    border-color: var(--border);
+  }
+  .btn-secondary:hover { border-color: var(--text-dimmer); color: var(--text); }
+
+  .btn-danger {
+    background: transparent;
+    color: var(--danger);
+    border-color: var(--danger);
+  }
+  .btn-danger:hover { background: var(--danger); color: #0e0e10; }
+
+  .btn-blue {
+    background: var(--accent2);
+    color: #0e0e10;
+    border-color: var(--accent2);
+  }
+  .btn-blue:hover { opacity: 0.85; }
+
+  .btn-full { width: 100%; }
+
+  .btn-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  /* Result card */
+  .result-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 16px 0;
+  }
+
+  .result-box {
+    background: var(--surface2);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+    text-align: center;
+  }
+
+  .result-box-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dimmer);
+    margin-bottom: 6px;
+  }
+
+  .result-box-value {
+    font-family: 'Fraunces', serif;
+    font-size: 32px;
+    font-weight: 300;
+  }
+
+  .result-gap {
+    background: var(--surface2);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+    text-align: center;
+    border: 1px solid var(--border);
+    margin-bottom: 12px;
+  }
+
+  .gap-positive { color: var(--accent); }
+  .gap-negative { color: var(--danger); }
+  .gap-neutral { color: var(--text-dim); }
+
+  /* History */
+  .history-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+
+  .history-item:hover { border-color: var(--text-dimmer); }
+
+  .history-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+  }
+
+  .history-task-name {
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  .history-date {
+    font-size: 10px;
+    color: var(--text-dimmer);
+  }
+
+  .history-stats {
+    display: flex;
+    gap: 16px;
+  }
+
+  .history-stat {
+    font-size: 10px;
+    color: var(--text-dimmer);
+  }
+
+  .history-stat span {
+    color: var(--text-dim);
+    font-size: 12px;
+  }
+
+  /* Averages */
+  .averages-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 12px;
+  }
+
+  .averages-card h3 {
+    font-family: 'Fraunces', serif;
+    font-size: 16px;
+    font-weight: 300;
+    font-style: italic;
+    margin-bottom: 14px;
+    color: var(--text-dim);
+  }
+
+  .avg-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+
+  .avg-row:last-child { border-bottom: none; }
+
+  .avg-task { color: var(--text); }
+  .avg-vals { display: flex; gap: 16px; }
+  .avg-predicted { color: var(--warn); font-size: 11px; }
+  .avg-actual { color: var(--accent); font-size: 11px; }
+  .avg-gap { font-size: 11px; }
+
+  /* Nav tabs */
+  .nav {
+    display: flex;
+    gap: 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 4px;
+    margin-bottom: 20px;
+  }
+
+  .nav-btn {
+    flex: 1;
+    padding: 8px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-dimmer);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .nav-btn.active {
+    background: var(--surface2);
+    color: var(--text);
+  }
+
+  /* Notification */
+  .notification {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--accent);
+    color: #0e0e10;
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    transition: transform 0.4s cubic-bezier(0.4,0,0.2,1);
+    z-index: 100;
+    white-space: nowrap;
+  }
+
+  .notification.show { transform: translateX(-50%) translateY(0); }
+
+  /* Divider */
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 20px 0;
+  }
+
+  /* Empty state */
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-dimmer);
+    font-size: 12px;
+    line-height: 1.8;
+  }
+
+  .empty-state .big { font-family: 'Fraunces', serif; font-size: 32px; font-style: italic; font-weight: 300; display: block; margin-bottom: 8px; color: var(--text-dim); }
+
+  /* Note field */
+  .note-field { margin-top: 12px; }
+  .note-field label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dimmer); margin-bottom: 6px; }
+
+  /* Missed task */
+  .missed-task-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    align-items: flex-end;
+  }
+  .missed-task-row > div { flex: 1; }
+  .missed-task-row label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dimmer); margin-bottom: 6px; }
+
+  input[type="number"] {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    padding: 10px 12px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  input[type="number"]:focus { border-color: var(--accent); }
+
+  .chip {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    letter-spacing: 0.05em;
+  }
+  .chip-green { background: rgba(200,240,117,0.15); color: var(--accent); }
+  .chip-warn { background: rgba(240,168,117,0.15); color: var(--warn); }
+  .chip-danger { background: rgba(240,117,117,0.15); color: var(--danger); }
+
+  .fade-in {
+    animation: fadeIn 0.3s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <h1>Field Tracker</h1>
+      <p>Energy cost analysis system</p>
+    </div>
+    <div class="date-badge" id="dateBadge"></div>
+  </div>
+
+  <!-- Nav -->
+  <div class="nav">
+    <button class="nav-btn active" onclick="showTab('track')">Track</button>
+    <button class="nav-btn" onclick="showTab('history')">History</button>
+    <button class="nav-btn" onclick="showTab('averages')">Averages</button>
+  </div>
+
+  <!-- TRACK TAB -->
+  <div id="tab-track">
+
+    <!-- Day Setup -->
+    <div id="setupSection" class="setup-card fade-in">
+      <h2>Start your day</h2>
+      <p>Set your baseline before logging any tasks. This calibrates your energy calculations.</p>
+
+      <div class="question">
+        <label>Are you experiencing extenuating circumstances?</label>
+        <div class="toggle-group">
+          <button class="toggle-btn" id="btn-no" onclick="setCircumstance(false)">No — Starting at 100</button>
+          <button class="toggle-btn" id="btn-yes" onclick="setCircumstance(true)">Yes — Starting at 95</button>
+        </div>
+      </div>
+
+      <button class="btn btn-primary btn-full" onclick="startDay()">Begin Day →</button>
+    </div>
+
+    <!-- Energy Display -->
+    <div id="energySection" style="display:none">
+      <div class="energy-card fade-in">
+        <div class="energy-header">
+          <span class="energy-label">Current Energy</span>
+          <div class="drain-pill">
+            <div class="drain-dot"></div>
+            <span id="drainRateLabel">−2 pts/hr passive</span>
+          </div>
+        </div>
+        <div class="energy-value" id="energyValue">100</div>
+        <div class="energy-bar-track">
+          <div class="energy-bar-fill" id="energyBar" style="width:100%"></div>
+        </div>
+        <div class="energy-meta">
+          <span id="startedAtLabel">Started —</span>
+          <span id="tasksCompletedLabel">0 tasks today</span>
+        </div>
+      </div>
+
+      <!-- Active timer section -->
+      <div id="activeTaskSection" style="display:none"></div>
+
+      <!-- New task form -->
+      <div id="newTaskSection">
+        <div class="section-label">Log a task</div>
+        <div class="task-card fade-in">
+          <div class="input-row">
+            <input type="text" id="taskInput" placeholder="Type task or select saved..." list="taskSuggestions" autocomplete="off">
+            <datalist id="taskSuggestions"></datalist>
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-header">
+              <span class="slider-label">Predicted Dread</span>
+              <span><span class="slider-value" id="dreadVal">5</span><span class="slider-sublabel">/ 10</span></span>
+            </div>
+            <input type="range" min="1" max="10" value="5" id="dreadSlider" oninput="document.getElementById('dreadVal').textContent=this.value">
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-header">
+              <span class="slider-label">Physical Toll</span>
+              <span><span class="slider-value" id="physVal">5</span><span class="slider-sublabel">/ 10</span></span>
+            </div>
+            <input type="range" min="1" max="10" value="5" id="physSlider" oninput="document.getElementById('physVal').textContent=this.value">
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-header">
+              <span class="slider-label">Mental Focus Required</span>
+              <span><span class="slider-value" id="mentalVal">5</span><span class="slider-sublabel">/ 10</span></span>
+            </div>
+            <input type="range" min="1" max="10" value="5" id="mentalSlider" oninput="document.getElementById('mentalVal').textContent=this.value">
+          </div>
+
+          <div style="margin-bottom:12px">
+            <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dimmer);margin-bottom:6px">What specifically do you think will be hard?</label>
+            <input type="text" id="whatHardInput" placeholder="Optional — name the specific dread...">
+          </div>
+
+          <button class="btn btn-blue btn-full" onclick="startTask()">Start Task + Timer →</button>
+
+          <div class="divider"></div>
+          <div style="font-size:11px;color:var(--text-dimmer);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.08em">Log task you already did (no timer)</div>
+          <div class="missed-task-row">
+            <div>
+              <label>Duration (minutes)</label>
+              <input type="number" id="missedDuration" placeholder="e.g. 45" min="1">
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-full" onclick="logMissedTask()">Log Without Timer</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- HISTORY TAB -->
+  <div id="tab-history" style="display:none">
+    <div class="section-label">Task History</div>
+    <div id="historyList"></div>
+  </div>
+
+  <!-- AVERAGES TAB -->
+  <div id="tab-averages" style="display:none">
+    <div class="section-label">Per-Task Averages</div>
+    <div class="averages-card">
+      <h3>Predicted vs. Actual Cost</h3>
+      <div style="font-size:10px;color:var(--text-dimmer);margin-bottom:12px;display:flex;gap:16px">
+        <span style="color:var(--warn)">■ predicted</span>
+        <span style="color:var(--accent)">■ actual</span>
+        <span style="color:var(--accent2)">■ gap saved</span>
+      </div>
+      <div id="averagesList"></div>
+    </div>
+    <div style="font-size:11px;color:var(--text-dimmer);text-align:center;padding:12px">
+      The gap between predicted and actual is your brain recalibrating.<br>Watch it shrink over time.
+    </div>
+    <button class="btn btn-danger btn-full" onclick="clearAllData()" style="margin-top:8px">Clear All Data</button>
+  </div>
+
+</div>
+
+<!-- Notification -->
+<div class="notification" id="notification"></div>
+
+<script>
+// =====================
+// STATE
+// =====================
+let state = {
+  dayStarted: false,
+  extenuating: false,
+  startEnergy: 100,
+  dayStartTime: null,
+  currentEnergy: 100,
+  tasksCompleted: 0,
+  activeTask: null,
+  timerInterval: null,
+  passiveDrainInterval: null,
+};
+
+const DRAIN_NORMAL = 2;      // pts per hour
+const DRAIN_EXTENUATING = 3; // pts per hour
+const TIME_COST_NORMAL = 1;       // per 30 min
+const TIME_COST_EXTENUATING = 1.5; // per 30 min
+
+// =====================
+// STORAGE
+// =====================
+function saveState() {
+  localStorage.setItem('fieldtracker_state', JSON.stringify(state));
+}
+
+function loadState() {
+  const saved = localStorage.getItem('fieldtracker_state');
+  if (saved) {
+    const s = JSON.parse(saved);
+    // Check if it's still the same day
+    if (s.dayStartTime) {
+      const savedDate = new Date(s.dayStartTime).toDateString();
+      const today = new Date().toDateString();
+      if (savedDate === today) {
+        state = s;
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function getHistory() {
+  return JSON.parse(localStorage.getItem('fieldtracker_history') || '[]');
+}
+
+function saveToHistory(entry) {
+  const history = getHistory();
+  history.unshift(entry);
+  localStorage.setItem('fieldtracker_history', JSON.stringify(history));
+}
+
+function getSavedTasks() {
+  return JSON.parse(localStorage.getItem('fieldtracker_tasks') || '[]');
+}
+
+function saveTask(name) {
+  const tasks = getSavedTasks();
+  if (!tasks.includes(name)) {
+    tasks.push(name);
+    localStorage.setItem('fieldtracker_tasks', JSON.stringify(tasks));
+  }
+}
+
+function clearAllData() {
+  if (confirm('Clear all history and averages? This cannot be undone.')) {
+    localStorage.removeItem('fieldtracker_history');
+    localStorage.removeItem('fieldtracker_tasks');
+    showNotification('All data cleared');
+    renderHistory();
+    renderAverages();
+    updateTaskSuggestions();
+  }
+}
+
+// =====================
+// INIT
+// =====================
+window.onload = function() {
+  updateDateBadge();
+  const resumed = loadState();
+  if (resumed && state.dayStarted) {
+    showDayActive();
+    // Recalculate passive drain from now
+    recalcEnergy();
+    startPassiveDrain();
+    if (state.activeTask) {
+      renderActiveTask();
+    }
+  }
+  updateTaskSuggestions();
+  renderHistory();
+  renderAverages();
+};
+
+function updateDateBadge() {
+  const now = new Date();
+  document.getElementById('dateBadge').innerHTML = 
+    now.toLocaleDateString('en-US', { weekday: 'long' }) + '<br>' +
+    now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + '<br>' +
+    now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  setTimeout(updateDateBadge, 10000);
+}
+
+// =====================
+// DAY SETUP
+// =====================
+function setCircumstance(val) {
+  state.extenuating = val;
+  document.getElementById('btn-yes').className = 'toggle-btn' + (val ? ' active-warn' : '');
+  document.getElementById('btn-no').className = 'toggle-btn' + (!val ? ' active' : '');
+}
+
+function startDay() {
+  state.dayStarted = true;
+  state.startEnergy = state.extenuating ? 95 : 100;
+  state.currentEnergy = state.startEnergy;
+  state.dayStartTime = Date.now();
+  state.tasksCompleted = 0;
+  saveState();
+  showDayActive();
+  startPassiveDrain();
+  showNotification(state.extenuating ? 'Day started at 95 — extenuating mode on' : 'Day started at 100 — let\'s go');
+}
+
+function showDayActive() {
+  document.getElementById('setupSection').style.display = 'none';
+  document.getElementById('energySection').style.display = 'block';
+  const rate = state.extenuating ? DRAIN_EXTENUATING : DRAIN_NORMAL;
+  document.getElementById('drainRateLabel').textContent = `−${rate} pts/hr passive`;
+  updateEnergyDisplay();
+}
+
+// =====================
+// PASSIVE DRAIN
+// =====================
+function recalcEnergy() {
+  if (!state.dayStartTime) return;
+  const hoursElapsed = (Date.now() - state.dayStartTime) / 3600000;
+  const rate = state.extenuating ? DRAIN_EXTENUATING : DRAIN_NORMAL;
+  const passiveLost = hoursElapsed * rate;
+  // Also subtract task costs that have been logged
+  const history = getHistory();
+  const today = new Date().toDateString();
+  const todayTasks = history.filter(h => new Date(h.timestamp).toDateString() === today);
+  const taskCost = todayTasks.reduce((sum, t) => sum + (t.actualCost || 0), 0);
+  state.currentEnergy = Math.max(0, state.startEnergy - passiveLost - taskCost);
+  saveState();
+}
+
+function startPassiveDrain() {
+  if (state.passiveDrainInterval) clearInterval(state.passiveDrainInterval);
+  state.passiveDrainInterval = setInterval(() => {
+    recalcEnergy();
+    updateEnergyDisplay();
+  }, 30000); // update every 30s
+}
+
+function updateEnergyDisplay() {
+  const e = Math.max(0, Math.round(state.currentEnergy * 10) / 10);
+  document.getElementById('energyValue').textContent = e.toFixed(1);
+  const pct = (e / 100) * 100;
+  const bar = document.getElementById('energyBar');
+  bar.style.width = pct + '%';
+
+  let color;
+  if (e > 60) color = 'var(--accent)';
+  else if (e > 30) color = 'var(--warn)';
+  else color = 'var(--danger)';
+
+  bar.style.background = color;
+  document.getElementById('energyValue').style.color = color;
+
+  const started = new Date(state.dayStartTime);
+  document.getElementById('startedAtLabel').textContent = 'Started ' + started.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'});
+  document.getElementById('tasksCompletedLabel').textContent = state.tasksCompleted + ' task' + (state.tasksCompleted !== 1 ? 's' : '') + ' today';
+}
+
+// =====================
+// TASK SUGGESTIONS
+// =====================
+function updateTaskSuggestions() {
+  const dl = document.getElementById('taskSuggestions');
+  if (!dl) return;
+  const tasks = getSavedTasks();
+  dl.innerHTML = tasks.map(t => `<option value="${t}">`).join('');
+}
+
+// =====================
+// START TASK
+// =====================
+function startTask() {
+  const name = document.getElementById('taskInput').value.trim();
+  if (!name) { showNotification('Name your task first'); return; }
+
+  const dread = parseInt(document.getElementById('dreadSlider').value);
+  const phys = parseInt(document.getElementById('physSlider').value);
+  const mental = parseInt(document.getElementById('mentalSlider').value);
+  const whatHard = document.getElementById('whatHardInput').value.trim();
+
+  const predictedCost = calcCost(dread, phys, mental, 0, false);
+
+  state.activeTask = {
+    name,
+    dread,
+    phys,
+    mental,
+    whatHard,
+    predictedCost,
+    startTime: Date.now(),
+    elapsed: 0,
+  };
+
+  saveTask(name);
+  updateTaskSuggestions();
+  saveState();
+
+  document.getElementById('newTaskSection').style.display = 'none';
+  renderActiveTask();
+  showNotification('Timer started — go do the thing');
+}
+
+function renderActiveTask() {
+  const t = state.activeTask;
+  if (!t) return;
+
+  const section = document.getElementById('activeTaskSection');
+  section.style.display = 'block';
+  section.innerHTML = `
+    <div class="section-label">Active Task</div>
+    <div class="task-card active-task fade-in">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-size:14px;color:var(--text)">${t.name}</div>
+        <div class="chip chip-green">running</div>
+      </div>
+      <div class="timer-display">
+        <div class="timer-digits" id="timerDigits">00:00:00</div>
+        <div class="timer-label">elapsed time</div>
+      </div>
+      <div style="font-size:11px;color:var(--text-dimmer);margin:12px 0">
+        Predicted cost: <span style="color:var(--warn)">${t.predictedCost.toFixed(1)} pts</span>
+        ${t.whatHard ? `<br>Dreading: ${t.whatHard}` : ''}
+      </div>
+      <button class="btn btn-primary btn-full" onclick="finishTask()">Finish Task →</button>
+    </div>
+  `;
+
+  startTimer();
+}
+
+function startTimer() {
+  if (state.timerInterval) clearInterval(state.timerInterval);
+  state.timerInterval = setInterval(() => {
+    if (!state.activeTask) return;
+    state.activeTask.elapsed = Date.now() - state.activeTask.startTime;
+    const el = document.getElementById('timerDigits');
+    if (el) el.textContent = formatDuration(state.activeTask.elapsed);
+    saveState();
+  }, 1000);
+}
+
+function formatDuration(ms) {
+  const s = Math.floor(ms / 1000);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return [h,m,sec].map(x => String(x).padStart(2,'0')).join(':');
+}
+
+function formatDurationShort(ms) {
+  const totalMin = Math.round(ms / 60000);
+  if (totalMin < 60) return `${totalMin}m`;
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+
+// =====================
+// FINISH TASK
+// =====================
+function finishTask() {
+  if (state.timerInterval) clearInterval(state.timerInterval);
+  const t = state.activeTask;
+  const elapsed = t.elapsed || (Date.now() - t.startTime);
+
+  // Show post-task form
+  const section = document.getElementById('activeTaskSection');
+  section.innerHTML = `
+    <div class="section-label">Post-Task Check-In</div>
+    <div class="task-card fade-in">
+      <div style="margin-bottom:16px">
+        <div style="font-size:13px;color:var(--text);margin-bottom:4px">${t.name}</div>
+        <div style="font-size:11px;color:var(--text-dimmer)">Actual time: <span style="color:var(--accent2)">${formatDurationShort(elapsed)}</span></div>
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <span class="slider-label">Actual Dread (vs reality)</span>
+          <span><span class="slider-value" id="actualDreadVal">5</span><span class="slider-sublabel">/ 10</span></span>
+        </div>
+        <input type="range" min="1" max="10" value="5" id="actualDreadSlider" oninput="document.getElementById('actualDreadVal').textContent=this.value">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <span class="slider-label">Actual Physical Toll</span>
+          <span><span class="slider-value" id="actualPhysVal">5</span><span class="slider-sublabel">/ 10</span></span>
+        </div>
+        <input type="range" min="1" max="10" value="5" id="actualPhysSlider" oninput="document.getElementById('actualPhysVal').textContent=this.value">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <span class="slider-label">Actual Mental Drain</span>
+          <span><span class="slider-value" id="actualMentalVal">5</span><span class="slider-sublabel">/ 10</span></span>
+        </div>
+        <input type="range" min="1" max="10" value="5" id="actualMentalSlider" oninput="document.getElementById('actualMentalVal').textContent=this.value">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <span class="slider-label">How do you feel now that it's done?</span>
+          <span><span class="slider-value" id="afterFeelVal">5</span><span class="slider-sublabel">/ 10</span></span>
+        </div>
+        <input type="range" min="1" max="10" value="5" id="afterFeelSlider" oninput="document.getElementById('afterFeelVal').textContent=this.value">
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-dimmer);margin-top:4px"><span>worse</span><span>better</span></div>
+      </div>
+
+      <div class="note-field">
+        <label>Notes (optional)</label>
+        <textarea id="taskNotes" placeholder="What was actually hard? What helped? Any context..."></textarea>
+      </div>
+
+      <button class="btn btn-primary btn-full" style="margin-top:16px" onclick="saveTask_final(${elapsed})">Save + See Results →</button>
+    </div>
+  `;
+}
+
+function saveTask_final(elapsed) {
+  const t = state.activeTask;
+  const actualDread = parseInt(document.getElementById('actualDreadSlider').value);
+  const actualPhys = parseInt(document.getElementById('actualPhysSlider').value);
+  const actualMental = parseInt(document.getElementById('actualMentalSlider').value);
+  const afterFeel = parseInt(document.getElementById('afterFeelSlider').value);
+  const notes = document.getElementById('taskNotes').value.trim();
+
+  const minutesElapsed = elapsed / 60000;
+  const timeCost = (minutesElapsed / 30) * (state.extenuating ? TIME_COST_EXTENUATING : TIME_COST_NORMAL);
+  const actualCost = calcCost(actualDread, actualPhys, actualMental, timeCost, true);
+  const predictedCost = t.predictedCost;
+  const gap = predictedCost - actualCost;
+
+  // Save to history
+  const entry = {
+    name: t.name,
+    timestamp: Date.now(),
+    extenuating: state.extenuating,
+    predicted: { dread: t.dread, phys: t.phys, mental: t.mental },
+    actual: { dread: actualDread, phys: actualPhys, mental: actualMental },
+    predictedCost,
+    actualCost,
+    gap,
+    afterFeel,
+    notes,
+    elapsed,
+    whatHard: t.whatHard,
+  };
+
+  saveToHistory(entry);
+  state.tasksCompleted++;
+  state.activeTask = null;
+  recalcEnergy();
+  updateEnergyDisplay();
+  saveState();
+
+  // Show result
+  showResult(entry);
+}
+
+function logMissedTask() {
+  const name = document.getElementById('taskInput').value.trim();
+  const mins = parseInt(document.getElementById('missedDuration').value);
+  if (!name) { showNotification('Name your task first'); return; }
+  if (!mins || mins < 1) { showNotification('Enter duration in minutes'); return; }
+
+  const dread = parseInt(document.getElementById('dreadSlider').value);
+  const phys = parseInt(document.getElementById('physSlider').value);
+  const mental = parseInt(document.getElementById('mentalSlider').value);
+
+  const timeCost = (mins / 30) * (state.extenuating ? TIME_COST_EXTENUATING : TIME_COST_NORMAL);
+  const actualCost = calcCost(dread, phys, mental, timeCost, true);
+
+  const entry = {
+    name,
+    timestamp: Date.now(),
+    extenuating: state.extenuating,
+    predicted: { dread, phys, mental },
+    actual: { dread, phys, mental },
+    predictedCost: actualCost,
+    actualCost,
+    gap: 0,
+    afterFeel: 5,
+    notes: 'Logged without timer',
+    elapsed: mins * 60000,
+    noTimer: true,
+  };
+
+  saveTask(name);
+  updateTaskSuggestions();
+  saveToHistory(entry);
+  state.tasksCompleted++;
+  recalcEnergy();
+  updateEnergyDisplay();
+  saveState();
+  showNotification('Task logged — ' + formatDurationShort(entry.elapsed));
+  resetTaskForm();
+  renderHistory();
+  renderAverages();
+}
+
+// =====================
+// COST CALC
+// =====================
+function calcCost(dread, phys, mental, timeCost, isActual) {
+  return (dread * 0.5) + (phys * 0.5) + (mental * 0.75) + timeCost;
+}
+
+// =====================
+// SHOW RESULT
+// =====================
+function showResult(entry) {
+  const section = document.getElementById('activeTaskSection');
+  const gap = entry.gap;
+  const gapClass = gap > 0 ? 'gap-positive' : gap < 0 ? 'gap-negative' : 'gap-neutral';
+  const gapLabel = gap > 0 ? `Your brain overestimated by ${gap.toFixed(1)} pts` : gap < 0 ? `Actually cost ${Math.abs(gap).toFixed(1)} pts more than expected` : 'Prediction was accurate';
+
+  section.innerHTML = `
+    <div class="section-label">Results</div>
+    <div class="task-card fade-in">
+      <div style="font-size:14px;color:var(--text);margin-bottom:4px">${entry.name}</div>
+      <div style="font-size:11px;color:var(--text-dimmer);margin-bottom:16px">${formatDurationShort(entry.elapsed)} · ${new Date(entry.timestamp).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</div>
+
+      <div class="result-grid">
+        <div class="result-box">
+          <div class="result-box-label">Predicted Cost</div>
+          <div class="result-box-value" style="color:var(--warn)">${entry.predictedCost.toFixed(1)}</div>
+        </div>
+        <div class="result-box">
+          <div class="result-box-label">Actual Cost</div>
+          <div class="result-box-value" style="color:var(--accent)">${entry.actualCost.toFixed(1)}</div>
+        </div>
+      </div>
+
+      <div class="result-gap">
+        <div class="result-box-label">Gap</div>
+        <div class="result-box-value ${gapClass}">${gap > 0 ? '+' : ''}${gap.toFixed(1)}</div>
+        <div style="font-size:11px;color:var(--text-dimmer);margin-top:4px">${gapLabel}</div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-dimmer);padding:8px 0;border-top:1px solid var(--border)">
+        <span>How you feel after</span>
+        <span style="color:var(--accent)">${entry.afterFeel}/10</span>
+      </div>
+
+      ${entry.notes ? `<div style="font-size:11px;color:var(--text-dimmer);padding:8px 0;border-top:1px solid var(--border);font-style:italic">"${entry.notes}"</div>` : ''}
+
+      <div class="btn-row">
+        <button class="btn btn-primary" style="flex:1" onclick="nextTask()">Log Another</button>
+        <button class="btn btn-secondary" style="flex:1" onclick="showTab('history')">View History</button>
+      </div>
+    </div>
+  `;
+
+  renderHistory();
+  renderAverages();
+}
+
+function nextTask() {
+  document.getElementById('activeTaskSection').style.display = 'none';
+  document.getElementById('newTaskSection').style.display = 'block';
+  resetTaskForm();
+}
+
+function resetTaskForm() {
+  document.getElementById('taskInput').value = '';
+  document.getElementById('dreadSlider').value = 5;
+  document.getElementById('physSlider').value = 5;
+  document.getElementById('mentalSlider').value = 5;
+  document.getElementById('dreadVal').textContent = '5';
+  document.getElementById('physVal').textContent = '5';
+  document.getElementById('mentalVal').textContent = '5';
+  document.getElementById('whatHardInput').value = '';
+  document.getElementById('missedDuration').value = '';
+}
+
+// =====================
+// HISTORY
+// =====================
+function renderHistory() {
+  const list = document.getElementById('historyList');
+  if (!list) return;
+  const history = getHistory();
+  if (history.length === 0) {
+    list.innerHTML = `<div class="empty-state"><span class="big">nothing yet</span>Start tracking tasks to build your data.</div>`;
+    return;
+  }
+
+  list.innerHTML = history.map((entry, i) => {
+    const gap = entry.gap;
+    const gapChip = gap > 1 ? `<span class="chip chip-green">saved ${gap.toFixed(1)} pts</span>` :
+                    gap < -1 ? `<span class="chip chip-danger">cost ${Math.abs(gap).toFixed(1)} more</span>` :
+                    `<span class="chip" style="background:rgba(136,136,150,0.15);color:var(--text-dim)">on target</span>`;
+
+    return `<div class="history-item fade-in">
+      <div class="history-item-header">
+        <span class="history-task-name">${entry.name}</span>
+        <span class="history-date">${new Date(entry.timestamp).toLocaleDateString('en-US',{month:'short',day:'numeric'})} · ${new Date(entry.timestamp).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</span>
+      </div>
+      <div class="history-stats">
+        <div class="history-stat">predicted <span>${entry.predictedCost.toFixed(1)}</span></div>
+        <div class="history-stat">actual <span>${entry.actualCost.toFixed(1)}</span></div>
+        <div class="history-stat">time <span>${formatDurationShort(entry.elapsed)}</span></div>
+        ${gapChip}
+      </div>
+      ${entry.notes ? `<div style="font-size:10px;color:var(--text-dimmer);margin-top:8px;font-style:italic">"${entry.notes}"</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// =====================
+// AVERAGES
+// =====================
+function renderAverages() {
+  const list = document.getElementById('averagesList');
+  if (!list) return;
+  const history = getHistory();
+  if (history.length === 0) {
+    list.innerHTML = `<div style="font-size:12px;color:var(--text-dimmer);padding:20px 0;text-align:center">No data yet</div>`;
+    return;
+  }
+
+  // Group by task name
+  const byTask = {};
+  history.forEach(entry => {
+    if (!byTask[entry.name]) byTask[entry.name] = [];
+    byTask[entry.name].push(entry);
+  });
+
+  const rows = Object.entries(byTask).map(([name, entries]) => {
+    const avgPredicted = entries.reduce((s, e) => s + e.predictedCost, 0) / entries.length;
+    const avgActual = entries.reduce((s, e) => s + e.actualCost, 0) / entries.length;
+    const avgGap = avgPredicted - avgActual;
+    const gapColor = avgGap > 0 ? 'var(--accent)' : avgGap < 0 ? 'var(--danger)' : 'var(--text-dim)';
+
+    return `<div class="avg-row">
+      <span class="avg-task">${name} <span style="color:var(--text-dimmer);font-size:10px">(${entries.length}x)</span></span>
+      <div class="avg-vals">
+        <span class="avg-predicted">${avgPredicted.toFixed(1)}</span>
+        <span class="avg-actual">${avgActual.toFixed(1)}</span>
+        <span class="avg-gap" style="color:${gapColor}">${avgGap > 0 ? '+' : ''}${avgGap.toFixed(1)}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  list.innerHTML = rows;
+}
+
+// =====================
+// TABS
+// =====================
+function showTab(tab) {
+  ['track', 'history', 'averages'].forEach(t => {
+    document.getElementById('tab-' + t).style.display = t === tab ? 'block' : 'none';
+  });
+  document.querySelectorAll('.nav-btn').forEach((btn, i) => {
+    btn.classList.toggle('active', ['track','history','averages'][i] === tab);
+  });
+  if (tab === 'history') renderHistory();
+  if (tab === 'averages') renderAverages();
+}
+
+// =====================
+// NOTIFICATION
+// =====================
+function showNotification(msg) {
+  const el = document.getElementById('notification');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2800);
+}
+</script>
+</body>
+</html>
