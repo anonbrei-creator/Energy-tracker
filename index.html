@@ -686,6 +686,18 @@
         </div>
       </div>
 
+      <div class="question">
+        <label>When did your day actually start?</label>
+        <div class="toggle-group" style="margin-bottom:8px">
+          <button class="toggle-btn active" id="btn-now" onclick="setStartMode('now')">Now</button>
+          <button class="toggle-btn" id="btn-custom" onclick="setStartMode('custom')">Earlier today</button>
+        </div>
+        <div id="customTimeInput" style="display:none;margin-top:8px">
+          <input type="time" id="wakeTime" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:'DM Mono',monospace;font-size:13px;padding:10px 12px;outline:none;">
+          <div style="font-size:10px;color:var(--text-dimmer);margin-top:6px">Passive drain will be calculated from this time forward</div>
+        </div>
+      </div>
+
       <button class="btn btn-primary btn-full" onclick="startDay()">Begin Day →</button>
     </div>
 
@@ -803,6 +815,7 @@
 let state = {
   dayStarted: false,
   extenuating: false,
+  startMode: 'now',
   startEnergy: 100,
   dayStartTime: null,
   currentEnergy: 100,
@@ -912,16 +925,54 @@ function setCircumstance(val) {
   document.getElementById('btn-no').className = 'toggle-btn' + (!val ? ' active' : '');
 }
 
+function setStartMode(mode) {
+  state.startMode = mode;
+  document.getElementById('btn-now').className = 'toggle-btn' + (mode === 'now' ? ' active' : '');
+  document.getElementById('btn-custom').className = 'toggle-btn' + (mode === 'custom' ? ' active' : '');
+  document.getElementById('customTimeInput').style.display = mode === 'custom' ? 'block' : 'none';
+  if (mode === 'custom') {
+    // Default the time input to 1 hour ago as a helpful starting point
+    const anHourAgo = new Date(Date.now() - 3600000);
+    document.getElementById('wakeTime').value = anHourAgo.toTimeString().slice(0,5);
+  }
+}
+
 function startDay() {
   state.dayStarted = true;
   state.startEnergy = state.extenuating ? 95 : 100;
-  state.currentEnergy = state.startEnergy;
-  state.dayStartTime = Date.now();
   state.tasksCompleted = 0;
+
+  // Figure out when the day actually started
+  if (state.startMode === 'custom') {
+    const timeVal = document.getElementById('wakeTime').value;
+    if (timeVal) {
+      const [hours, minutes] = timeVal.split(':').map(Number);
+      const wakeDate = new Date();
+      wakeDate.setHours(hours, minutes, 0, 0);
+      // If the time is in the future somehow, use now
+      state.dayStartTime = wakeDate.getTime() > Date.now() ? Date.now() : wakeDate.getTime();
+    } else {
+      state.dayStartTime = Date.now();
+    }
+  } else {
+    state.dayStartTime = Date.now();
+  }
+
+  // Calculate how much passive drain has already occurred
+  const hoursElapsed = (Date.now() - state.dayStartTime) / 3600000;
+  const rate = state.extenuating ? DRAIN_EXTENUATING : DRAIN_NORMAL;
+  const alreadyDrained = hoursElapsed * rate;
+  state.currentEnergy = Math.max(0, state.startEnergy - alreadyDrained);
+
   saveState();
   showDayActive();
   startPassiveDrain();
-  showNotification(state.extenuating ? 'Day started at 95 — extenuating mode on' : 'Day started at 100 — let\'s go');
+
+  const drained = (state.startEnergy - state.currentEnergy).toFixed(1);
+  const msg = state.startMode === 'custom' && drained > 0
+    ? `Started at ${state.startEnergy}, already drained ${drained} pts — you're at ${state.currentEnergy.toFixed(1)}`
+    : state.extenuating ? 'Day started at 95 — extenuating mode on' : 'Day started at 100 — let\'s go';
+  showNotification(msg);
 }
 
 function showDayActive() {
