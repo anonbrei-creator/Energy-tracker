@@ -1014,20 +1014,6 @@ function showScreen(name) {
 
 function goToTrack() {
   showScreen('track');
-  // If day is already active for today, skip choice and go straight to tracker
-  if (state.dayStarted && state.dayStartTime) {
-    const savedDate = new Date(state.dayStartTime).toDateString();
-    const today = new Date().toDateString();
-    if (savedDate === today) {
-      showDayChoice(false);
-      showDayActive();
-      recalcEnergy();
-      startPassiveDrain();
-      if (state.activeTask) renderActiveTask();
-      return;
-    }
-  }
-  // Otherwise show choice
   showDayChoice(true);
 }
 
