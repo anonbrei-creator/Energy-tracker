@@ -912,8 +912,36 @@
           <button class="btn btn-secondary btn-full" onclick="logMissedTask()">Log Without Timer</button>
         </div>
       </div>
+
+      <!-- Recovery section -->
+      <div id="recoverySection">
+        <div class="section-label">Log recovery</div>
+        <div class="task-card fade-in" style="border-color:rgba(117,200,240,0.2)">
+          <div style="font-size:11px;color:var(--text-dimmer);margin-bottom:12px;line-height:1.6">Rest, walks, meditation, naps — anything restorative. Points are added back to your energy.</div>
+          <div class="input-row">
+            <input type="text" id="recoveryInput" placeholder="Type activity or select saved..." list="recoverySuggestions">
+            <datalist id="recoverySuggestions"></datalist>
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-header">
+              <span class="slider-label">How restorative was this?</span>
+              <span><span class="slider-value" id="recoveryVal">5</span><span class="slider-sublabel">/ 10</span></span>
+            </div>
+            <input type="range" min="1" max="10" value="5" id="recoverySlider" oninput="document.getElementById('recoveryVal').textContent=this.value;document.getElementById('recoveryPreview').textContent='+' + (this.value * 0.75).toFixed(2)">
+            <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-dimmer);margin-top:4px"><span>barely helped</span><span>fully restored</span></div>
+          </div>
+
+          <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px;font-size:11px;color:var(--text-dimmer);margin-bottom:12px">
+            Points back: <span id="recoveryPreview" style="color:var(--accent2);font-size:13px">+3.75</span>
+          </div>
+
+          <button class="btn btn-full" style="background:rgba(117,200,240,0.15);border:1px solid var(--accent2);color:var(--accent2)" onclick="logRecovery()">Log Recovery →</button>
+        </div>
+      </div>
     </div>
   </div>
+
 
   <!-- HISTORY SCREEN -->
   <div id="screen-history" style="display:none">
@@ -1155,6 +1183,9 @@ function clearAllData() {
   if (confirm('Clear all history and averages? This cannot be undone.')) {
     localStorage.removeItem('fieldtracker_history');
     localStorage.removeItem('fieldtracker_tasks');
+    localStorage.removeItem('fieldtracker_recovery_history');
+    localStorage.removeItem('fieldtracker_recovery_activities');
+    localStorage.removeItem('fieldtracker_wraps');
     showNotification('All data cleared');
     renderHistory();
     renderAverages();
@@ -1399,9 +1430,72 @@ function updateEnergyDisplay() {
 // =====================
 function updateTaskSuggestions() {
   const dl = document.getElementById('taskSuggestions');
-  if (!dl) return;
-  const tasks = getSavedTasks();
-  dl.innerHTML = tasks.map(t => `<option value="${t}">`).join('');
+  if (dl) {
+    const tasks = getSavedTasks();
+    dl.innerHTML = tasks.map(t => `<option value="${t}">`).join('');
+  }
+  const rl = document.getElementById('recoverySuggestions');
+  if (rl) {
+    const activities = getSavedRecoveryActivities();
+    rl.innerHTML = activities.map(a => `<option value="${a}">`).join('');
+  }
+}
+
+function getSavedRecoveryActivities() {
+  return JSON.parse(localStorage.getItem('fieldtracker_recovery_activities') || '[]');
+}
+
+function saveRecoveryActivity(name) {
+  const activities = getSavedRecoveryActivities();
+  if (!activities.includes(name)) {
+    activities.push(name);
+    localStorage.setItem('fieldtracker_recovery_activities', JSON.stringify(activities));
+  }
+}
+
+function getRecoveryHistory() {
+  return JSON.parse(localStorage.getItem('fieldtracker_recovery_history') || '[]');
+}
+
+function saveToRecoveryHistory(entry) {
+  const history = getRecoveryHistory();
+  history.unshift(entry);
+  localStorage.setItem('fieldtracker_recovery_history', JSON.stringify(history));
+}
+
+function logRecovery() {
+  const name = document.getElementById('recoveryInput').value.trim();
+  if (!name) { showNotification('Name your recovery activity first'); return; }
+
+  const rating = parseInt(document.getElementById('recoverySlider').value);
+  const pointsBack = parseFloat((rating * 0.75).toFixed(2));
+
+  // Cap at starting energy
+  const newEnergy = Math.min(state.startEnergy, state.currentEnergy + pointsBack);
+  const actualPointsBack = parseFloat((newEnergy - state.currentEnergy).toFixed(2));
+  state.currentEnergy = newEnergy;
+  saveState();
+  updateEnergyDisplay();
+
+  const entry = {
+    name,
+    timestamp: Date.now(),
+    rating,
+    pointsBack: actualPointsBack,
+    type: 'recovery',
+  };
+
+  saveToRecoveryHistory(entry);
+  saveRecoveryActivity(name);
+  updateTaskSuggestions();
+
+  // Reset form
+  document.getElementById('recoveryInput').value = '';
+  document.getElementById('recoverySlider').value = 5;
+  document.getElementById('recoveryVal').textContent = '5';
+  document.getElementById('recoveryPreview').textContent = '+3.75';
+
+  showNotification(`+${actualPointsBack} pts restored — nice`);
 }
 
 // =====================
@@ -1718,12 +1812,33 @@ function renderHistory() {
   const list = document.getElementById('historyList');
   if (!list) return;
   const history = getHistory();
-  if (history.length === 0) {
+  const recoveryHistory = getRecoveryHistory();
+
+  // Merge and sort by timestamp
+  const allEntries = [
+    ...history.map(e => ({...e, entryType: 'task'})),
+    ...recoveryHistory.map(e => ({...e, entryType: 'recovery'}))
+  ].sort((a, b) => b.timestamp - a.timestamp);
+
+  if (allEntries.length === 0) {
     list.innerHTML = `<div class="empty-state"><span class="big">nothing yet</span>Start tracking tasks to build your data.</div>`;
     return;
   }
 
-  list.innerHTML = history.map((entry, i) => {
+  list.innerHTML = allEntries.map((entry) => {
+    if (entry.entryType === 'recovery') {
+      return `<div class="history-item fade-in" style="border-color:rgba(117,200,240,0.2)">
+        <div class="history-item-header">
+          <span class="history-task-name" style="color:var(--accent2)">↑ ${entry.name}</span>
+          <span class="history-date">${new Date(entry.timestamp).toLocaleDateString('en-US',{month:'short',day:'numeric'})} · ${new Date(entry.timestamp).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</span>
+        </div>
+        <div class="history-stats">
+          <div class="history-stat">restorative <span>${entry.rating}/10</span></div>
+          <div class="history-stat">points back <span style="color:var(--accent2)">+${entry.pointsBack}</span></div>
+        </div>
+      </div>`;
+    }
+
     const gap = entry.gap;
     const gapChip = gap > 1 ? `<span class="chip chip-green">saved ${gap.toFixed(1)} pts</span>` :
                     gap < -1 ? `<span class="chip chip-danger">cost ${Math.abs(gap).toFixed(1)} more</span>` :
@@ -1930,6 +2045,9 @@ function exportData() {
     exportedAt: new Date().toISOString(),
     history: getHistory(),
     tasks: getSavedTasks(),
+    recoveryHistory: getRecoveryHistory(),
+    recoveryActivities: getSavedRecoveryActivities(),
+    wraps: getWraps(),
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -2103,6 +2221,40 @@ function buildAndSaveWrap(startVal, endVal, startDate, endDate, entries, wraps, 
   // Average gap across all tasks
   const avgGap = withGaps.length ? withGaps.reduce((s, e) => s + e.gap, 0) / withGaps.length : 0;
 
+  // Recovery stats
+  const recoveryHistory = getRecoveryHistory();
+  const recoveryEntries = recoveryHistory.filter(e => {
+    const d = new Date(e.timestamp);
+    return d >= startDate && d <= endDate;
+  });
+
+  const totalPointsRecovered = recoveryEntries.reduce((s, e) => s + e.pointsBack, 0);
+
+  // Most restorative activity by avg rating
+  const recoveryByName = {};
+  recoveryEntries.forEach(e => {
+    if (!recoveryByName[e.name]) recoveryByName[e.name] = [];
+    recoveryByName[e.name].push(e.rating);
+  });
+  const mostRestorativeActivity = Object.keys(recoveryByName).length > 0
+    ? Object.entries(recoveryByName).reduce((a, b) => {
+        const avgA = a[1].reduce((s,v) => s+v,0) / a[1].length;
+        const avgB = b[1].reduce((s,v) => s+v,0) / b[1].length;
+        return avgA >= avgB ? a : b;
+      })
+    : null;
+
+  // Most restorative day
+  const recoveryByDay = {};
+  recoveryEntries.forEach(e => {
+    const day = new Date(e.timestamp).toDateString();
+    if (!recoveryByDay[day]) recoveryByDay[day] = 0;
+    recoveryByDay[day] += e.pointsBack;
+  });
+  const mostRestorativeDay = Object.keys(recoveryByDay).length > 0
+    ? Object.entries(recoveryByDay).reduce((a, b) => a[1] >= b[1] ? a : b)
+    : null;
+
   const wrap = {
     id: Date.now(),
     startDate: startVal,
@@ -2121,6 +2273,13 @@ function buildAndSaveWrap(startVal, endVal, startDate, endDate, entries, wraps, 
     mostLoggedTask: mostLoggedTask[0],
     mostLoggedCount: mostLoggedTask[1],
     avgGap: avgGap.toFixed(1),
+    totalRecoverySessions: recoveryEntries.length,
+    totalPointsRecovered: totalPointsRecovered.toFixed(1),
+    mostRestorativeActivity: mostRestorativeActivity ? mostRestorativeActivity[0] : null,
+    mostRestorativeActivityCount: mostRestorativeActivity ? mostRestorativeActivity[1].length : 0,
+    mostRestorativeActivityAvg: mostRestorativeActivity ? (mostRestorativeActivity[1].reduce((s,v) => s+v,0) / mostRestorativeActivity[1].length).toFixed(1) : null,
+    mostRestorativeDay: mostRestorativeDay ? mostRestorativeDay[0] : null,
+    mostRestorativeDayPoints: mostRestorativeDay ? mostRestorativeDay[1].toFixed(1) : null,
   };
 
   if (existing) {
@@ -2226,6 +2385,28 @@ function openWrappedDetail(id) {
     </div>
 
     <button class="btn btn-danger btn-full" style="margin-top:20px" onclick="deleteWrap(${w.id})">Delete This Wrap</button>
+
+    ${w.totalRecoverySessions > 0 ? `
+    <div style="font-family:'Fraunces',serif;font-size:18px;font-weight:300;font-style:italic;color:var(--accent2);margin:24px 0 12px">Recovery</div>
+
+    <div class="wrap-stat-card" style="border-color:rgba(117,200,240,0.2)">
+      <div class="wrap-stat-label">💧 Total Recovery Sessions</div>
+      <div class="wrap-stat-value" style="color:var(--accent2)">${w.totalRecoverySessions}</div>
+      <div class="wrap-stat-sub">+${w.totalPointsRecovered} pts recovered in total</div>
+    </div>
+
+    ${w.mostRestorativeActivity ? `<div class="wrap-stat-card" style="border-color:rgba(117,200,240,0.2)">
+      <div class="wrap-stat-label">🌿 Most Restorative Activity</div>
+      <div class="wrap-stat-value" style="color:var(--accent2)">${w.mostRestorativeActivity}</div>
+      <div class="wrap-stat-sub">logged ${w.mostRestorativeActivityCount} time${w.mostRestorativeActivityCount !== 1 ? 's' : ''} · avg rating ${w.mostRestorativeActivityAvg}/10</div>
+    </div>` : ''}
+
+    ${w.mostRestorativeDay ? `<div class="wrap-stat-card" style="border-color:rgba(117,200,240,0.2)">
+      <div class="wrap-stat-label">📅 Most Restorative Day</div>
+      <div class="wrap-stat-value" style="color:var(--accent2)">${new Date(w.mostRestorativeDay).toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})}</div>
+      <div class="wrap-stat-sub">+${w.mostRestorativeDayPoints} pts recovered</div>
+    </div>` : ''}
+    ` : `<div style="font-size:11px;color:var(--text-dimmer);text-align:center;padding:16px 0">No recovery sessions logged this period</div>`}
   `;
 
   showScreen('wrapped-detail');
