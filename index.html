@@ -712,6 +712,38 @@
   }
 
   .back-btn:hover { color: var(--accent); }
+
+  /* Wrapped stat cards */
+  .wrap-stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin-bottom: 10px;
+  }
+
+  .wrap-stat-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dimmer);
+    margin-bottom: 6px;
+  }
+
+  .wrap-stat-value {
+    font-family: 'Fraunces', serif;
+    font-size: 28px;
+    font-weight: 300;
+    color: var(--text);
+    line-height: 1.1;
+    margin-bottom: 4px;
+  }
+
+  .wrap-stat-sub {
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
 </style>
 </head>
 <body>
@@ -750,6 +782,14 @@
         <div class="home-card-text">
           <div class="home-card-title">Averages</div>
           <div class="home-card-sub">Predicted vs actual over time</div>
+        </div>
+        <div class="home-card-arrow">→</div>
+      </button>
+      <button class="home-card" onclick="showScreen('wrapped');renderWrappedList()">
+        <div class="home-card-icon">✨</div>
+        <div class="home-card-text">
+          <div class="home-card-title">Wrapped</div>
+          <div class="home-card-sub">Your weekly breakdowns</div>
         </div>
         <div class="home-card-arrow">→</div>
       </button>
@@ -882,7 +922,42 @@
     <div id="historyList"></div>
   </div>
 
-  <!-- EDIT TASK SCREEN -->
+  <!-- WRAPPED LIST SCREEN -->
+  <div id="screen-wrapped" style="display:none">
+    <button class="back-btn" onclick="showScreen('home')">← Home</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div class="section-label" style="margin:0">Wrapped</div>
+      <button class="btn btn-primary" style="font-size:11px;padding:7px 14px" onclick="showGenerateWrapped()">+ Generate</button>
+    </div>
+
+    <!-- Generate form -->
+    <div id="generateWrappedForm" style="display:none" class="setup-card fade-in">
+      <h2>Generate a Wrap</h2>
+      <p>Select a date range to generate your wrapped report. Works best for a full week.</p>
+      <div style="display:flex;gap:12px;margin-bottom:16px">
+        <div style="flex:1">
+          <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dimmer);margin-bottom:6px">From</label>
+          <input type="date" id="wrapStartDate" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:'DM Mono',monospace;font-size:12px;padding:10px 12px;outline:none;">
+        </div>
+        <div style="flex:1">
+          <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dimmer);margin-bottom:6px">To</label>
+          <input type="date" id="wrapEndDate" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:'DM Mono',monospace;font-size:12px;padding:10px 12px;outline:none;">
+        </div>
+      </div>
+      <div class="btn-row" style="margin-top:0">
+        <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('generateWrappedForm').style.display='none'">Cancel</button>
+        <button class="btn btn-primary" style="flex:1" onclick="generateWrapped()">Generate →</button>
+      </div>
+    </div>
+
+    <div id="wrappedList"></div>
+  </div>
+
+  <!-- WRAPPED DETAIL SCREEN -->
+  <div id="screen-wrapped-detail" style="display:none">
+    <button class="back-btn" onclick="showScreen('wrapped');renderWrappedList()">← Wrapped</button>
+    <div id="wrappedDetailContent"></div>
+  </div>
   <div id="screen-edit" style="display:none">
     <button class="back-btn" onclick="showScreen('history');renderHistory()">← History</button>
     <div class="section-label">Edit Task</div>
@@ -1101,7 +1176,7 @@ window.onload = function() {
 // SCREEN NAVIGATION
 // =====================
 function showScreen(name) {
-  ['home','track','history','averages','edit'].forEach(s => {
+  ['home','track','history','averages','edit','wrapped','wrapped-detail'].forEach(s => {
     document.getElementById('screen-' + s).style.display = s === name ? 'block' : 'none';
   });
 }
@@ -1910,6 +1985,268 @@ function importData(event) {
     event.target.value = '';
   };
   reader.readAsText(file);
+}
+
+// =====================
+// WRAPPED
+// =====================
+function getWraps() {
+  return JSON.parse(localStorage.getItem('fieldtracker_wraps') || '[]');
+}
+
+function saveWraps(wraps) {
+  localStorage.setItem('fieldtracker_wraps', JSON.stringify(wraps));
+}
+
+function showGenerateWrapped() {
+  const form = document.getElementById('generateWrappedForm');
+  form.style.display = form.style.display === 'none' ? 'block' : 'none';
+  if (form.style.display === 'block') {
+    // Default to most recent Sunday-Saturday
+    const now = new Date();
+    const day = now.getDay(); // 0=Sun
+    const lastSun = new Date(now);
+    lastSun.setDate(now.getDate() - day - 7);
+    const lastSat = new Date(lastSun);
+    lastSat.setDate(lastSun.getDate() + 6);
+    document.getElementById('wrapStartDate').value = lastSun.toISOString().slice(0,10);
+    document.getElementById('wrapEndDate').value = lastSat.toISOString().slice(0,10);
+  }
+}
+
+function generateWrapped() {
+  const startVal = document.getElementById('wrapStartDate').value;
+  const endVal = document.getElementById('wrapEndDate').value;
+
+  if (!startVal || !endVal) { showNotification('Pick a start and end date'); return; }
+
+  const startDate = new Date(startVal + 'T00:00:00');
+  const endDate = new Date(endVal + 'T23:59:59');
+
+  if (startDate > endDate) { showNotification('Start date must be before end date'); return; }
+
+  const history = getHistory();
+  const entries = history.filter(e => {
+    const d = new Date(e.timestamp);
+    return d >= startDate && d <= endDate;
+  });
+
+  if (entries.length === 0) {
+    showNotification('No data found in that date range');
+    return;
+  }
+
+  // Check if wrap already exists for this range
+  const wraps = getWraps();
+  const exists = wraps.find(w => w.startDate === startVal && w.endDate === endVal);
+  if (exists) {
+    showModal(
+      'Wrap already exists',
+      'A wrap for this date range already exists. Do you want to regenerate it with current data?',
+      [
+        { label: 'Regenerate', style: 'btn-primary', action: () => {
+          closeModal();
+          buildAndSaveWrap(startVal, endVal, startDate, endDate, entries, wraps, exists);
+        }},
+        { label: 'Cancel', style: 'btn-secondary', action: closeModal }
+      ]
+    );
+    return;
+  }
+
+  buildAndSaveWrap(startVal, endVal, startDate, endDate, entries, wraps, null);
+}
+
+function buildAndSaveWrap(startVal, endVal, startDate, endDate, entries, wraps, existing) {
+  // Group entries by day
+  const byDay = {};
+  entries.forEach(e => {
+    const day = new Date(e.timestamp).toDateString();
+    if (!byDay[day]) byDay[day] = [];
+    byDay[day].push(e);
+  });
+
+  const activeDays = Object.keys(byDay);
+  const taskCountsByDay = activeDays.map(d => byDay[d].length);
+
+  // Longest streak of consecutive days
+  const sortedDays = activeDays.map(d => new Date(d)).sort((a,b) => a-b);
+  let longestStreak = 1, currentStreak = 1;
+  for (let i = 1; i < sortedDays.length; i++) {
+    const diff = (sortedDays[i] - sortedDays[i-1]) / 86400000;
+    if (diff === 1) { currentStreak++; longestStreak = Math.max(longestStreak, currentStreak); }
+    else currentStreak = 1;
+  }
+
+  // Most/least tasks in a day
+  const mostTasksDay = activeDays.reduce((a, b) => byDay[a].length >= byDay[b].length ? a : b);
+  const leastTasksDay = activeDays.reduce((a, b) => byDay[a].length <= byDay[b].length ? a : b);
+
+  // Biggest/smallest gap (individual tasks)
+  const withGaps = entries.filter(e => !e.noTimer);
+  const biggestGapEntry = withGaps.length ? withGaps.reduce((a, b) => a.gap >= b.gap ? a : b) : null;
+  const smallestGapEntry = withGaps.length ? withGaps.reduce((a, b) => Math.abs(a.gap) <= Math.abs(b.gap) ? a : b) : null;
+
+  // Most drained day
+  const mostDrainedDay = activeDays.reduce((a, b) => {
+    const costA = byDay[a].reduce((s, e) => s + e.actualCost, 0);
+    const costB = byDay[b].reduce((s, e) => s + e.actualCost, 0);
+    return costA >= costB ? a : b;
+  });
+  const mostDrainedCost = byDay[mostDrainedDay].reduce((s, e) => s + e.actualCost, 0);
+
+  // Most logged task
+  const taskCounts = {};
+  entries.forEach(e => { taskCounts[e.name] = (taskCounts[e.name] || 0) + 1; });
+  const mostLoggedTask = Object.entries(taskCounts).reduce((a, b) => a[1] >= b[1] ? a : b);
+
+  // Average gap across all tasks
+  const avgGap = withGaps.length ? withGaps.reduce((s, e) => s + e.gap, 0) / withGaps.length : 0;
+
+  const wrap = {
+    id: Date.now(),
+    startDate: startVal,
+    endDate: endVal,
+    totalTasks: entries.length,
+    activeDays: activeDays.length,
+    longestStreak,
+    mostTasksDay,
+    mostTasksCount: byDay[mostTasksDay].length,
+    leastTasksDay,
+    leastTasksCount: byDay[leastTasksDay].length,
+    biggestGapEntry,
+    smallestGapEntry,
+    mostDrainedDay,
+    mostDrainedCost: mostDrainedCost.toFixed(1),
+    mostLoggedTask: mostLoggedTask[0],
+    mostLoggedCount: mostLoggedTask[1],
+    avgGap: avgGap.toFixed(1),
+  };
+
+  if (existing) {
+    const idx = wraps.findIndex(w => w.startDate === startVal && w.endDate === endVal);
+    wraps[idx] = wrap;
+  } else {
+    wraps.unshift(wrap);
+  }
+
+  saveWraps(wraps);
+  document.getElementById('generateWrappedForm').style.display = 'none';
+  renderWrappedList();
+  showNotification('Wrap generated');
+}
+
+function renderWrappedList() {
+  const list = document.getElementById('wrappedList');
+  const wraps = getWraps();
+
+  if (wraps.length === 0) {
+    list.innerHTML = `<div class="empty-state"><span class="big">nothing yet</span>Hit Generate to create your first wrap.</div>`;
+    return;
+  }
+
+  list.innerHTML = wraps.map(w => {
+    const start = new Date(w.startDate + 'T00:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric'});
+    const end = new Date(w.endDate + 'T00:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+    return `<div class="history-item fade-in" onclick="openWrappedDetail(${w.id})" style="cursor:pointer">
+      <div class="history-item-header">
+        <span class="history-task-name" style="font-family:'Fraunces',serif;font-style:italic">${start} — ${end}</span>
+        <span class="history-date">→</span>
+      </div>
+      <div class="history-stats">
+        <div class="history-stat">tasks <span>${w.totalTasks}</span></div>
+        <div class="history-stat">active days <span>${w.activeDays}</span></div>
+        <div class="history-stat">avg gap <span style="color:${parseFloat(w.avgGap) > 0 ? 'var(--accent2)' : 'var(--danger)'}">${parseFloat(w.avgGap) > 0 ? '+' : ''}${w.avgGap}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openWrappedDetail(id) {
+  const wraps = getWraps();
+  const w = wraps.find(w => w.id === id);
+  if (!w) return;
+
+  const start = new Date(w.startDate + 'T00:00:00').toLocaleDateString('en-US', {month:'long', day:'numeric'});
+  const end = new Date(w.endDate + 'T00:00:00').toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'});
+
+  const fmtDay = d => new Date(d).toLocaleDateString('en-US', {weekday:'long', month:'short', day:'numeric'});
+
+  const content = document.getElementById('wrappedDetailContent');
+  content.innerHTML = `
+    <div style="font-family:'Fraunces',serif;font-size:24px;font-weight:300;font-style:italic;margin-bottom:4px">${start} — ${end}</div>
+    <div style="font-size:11px;color:var(--text-dimmer);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:24px">${w.totalTasks} tasks · ${w.activeDays} active days</div>
+
+    <div class="wrap-stat-card">
+      <div class="wrap-stat-label">🔥 Longest Streak</div>
+      <div class="wrap-stat-value">${w.longestStreak} day${w.longestStreak !== 1 ? 's' : ''}</div>
+      <div class="wrap-stat-sub">consecutive days with at least one task logged</div>
+    </div>
+
+    <div class="wrap-stat-card">
+      <div class="wrap-stat-label">📈 Most Tasks in a Day</div>
+      <div class="wrap-stat-value">${w.mostTasksCount} tasks</div>
+      <div class="wrap-stat-sub">${fmtDay(w.mostTasksDay)}</div>
+    </div>
+
+    <div class="wrap-stat-card">
+      <div class="wrap-stat-label">📉 Least Tasks in a Day</div>
+      <div class="wrap-stat-value">${w.leastTasksCount} task${w.leastTasksCount !== 1 ? 's' : ''}</div>
+      <div class="wrap-stat-sub">${fmtDay(w.leastTasksDay)}</div>
+    </div>
+
+    ${w.biggestGapEntry ? `<div class="wrap-stat-card">
+      <div class="wrap-stat-label">🎯 Biggest Gap</div>
+      <div class="wrap-stat-value" style="color:var(--accent2)">+${w.biggestGapEntry.gap.toFixed(1)} pts</div>
+      <div class="wrap-stat-sub">${w.biggestGapEntry.name} — your brain overestimated the most here</div>
+    </div>` : ''}
+
+    ${w.smallestGapEntry ? `<div class="wrap-stat-card">
+      <div class="wrap-stat-label">🎯 Smallest Gap</div>
+      <div class="wrap-stat-value" style="color:var(--accent)">${w.smallestGapEntry.gap.toFixed(1)} pts</div>
+      <div class="wrap-stat-sub">${w.smallestGapEntry.name} — your prediction was closest here</div>
+    </div>` : ''}
+
+    <div class="wrap-stat-card">
+      <div class="wrap-stat-label">⚡ Most Drained Day</div>
+      <div class="wrap-stat-value" style="color:var(--warn)">${w.mostDrainedCost} pts</div>
+      <div class="wrap-stat-sub">${fmtDay(w.mostDrainedDay)}</div>
+    </div>
+
+    <div class="wrap-stat-card">
+      <div class="wrap-stat-label">🔁 Most Logged Task</div>
+      <div class="wrap-stat-value">${w.mostLoggedTask}</div>
+      <div class="wrap-stat-sub">logged ${w.mostLoggedCount} time${w.mostLoggedCount !== 1 ? 's' : ''} this period</div>
+    </div>
+
+    <div class="wrap-stat-card">
+      <div class="wrap-stat-label">📊 Average Gap This Period</div>
+      <div class="wrap-stat-value" style="color:${parseFloat(w.avgGap) > 0 ? 'var(--accent2)' : 'var(--danger)'}">${parseFloat(w.avgGap) > 0 ? '+' : ''}${w.avgGap} pts</div>
+      <div class="wrap-stat-sub">${parseFloat(w.avgGap) > 0 ? 'Your brain overestimated on average — recalibration is working' : 'Tasks cost more than expected on average this period'}</div>
+    </div>
+
+    <button class="btn btn-danger btn-full" style="margin-top:20px" onclick="deleteWrap(${w.id})">Delete This Wrap</button>
+  `;
+
+  showScreen('wrapped-detail');
+}
+
+function deleteWrap(id) {
+  showModal(
+    'Delete this wrap?',
+    'This wrapped report will be permanently removed. Your task history is not affected.',
+    [
+      { label: 'Delete', style: 'btn-danger', action: () => {
+        const wraps = getWraps().filter(w => w.id !== id);
+        saveWraps(wraps);
+        closeModal();
+        showScreen('wrapped');
+        renderWrappedList();
+        showNotification('Wrap deleted');
+      }},
+      { label: 'Cancel', style: 'btn-secondary', action: closeModal }
+    ]
+  );
 }
 
 // =====================
