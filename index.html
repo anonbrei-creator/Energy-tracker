@@ -882,6 +882,90 @@
     <div id="historyList"></div>
   </div>
 
+  <!-- EDIT TASK SCREEN -->
+  <div id="screen-edit" style="display:none">
+    <button class="back-btn" onclick="showScreen('history');renderHistory()">← History</button>
+    <div class="section-label">Edit Task</div>
+    <div class="task-card fade-in">
+
+      <div style="margin-bottom:16px">
+        <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dimmer);margin-bottom:6px">Task Name</label>
+        <input type="text" id="editTaskName" placeholder="Task name">
+      </div>
+
+      <div style="font-family:'Fraunces',serif;font-size:14px;font-style:italic;color:var(--text-dim);margin-bottom:12px">Predicted</div>
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <span class="slider-label">Dread</span>
+          <span><span class="slider-value" id="editPredDreadVal">5</span><span class="slider-sublabel">/ 10</span></span>
+        </div>
+        <input type="range" min="1" max="10" value="5" id="editPredDreadSlider" oninput="document.getElementById('editPredDreadVal').textContent=this.value">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <span class="slider-label">Physical Toll</span>
+          <span><span class="slider-value" id="editPredPhysVal">5</span><span class="slider-sublabel">/ 10</span></span>
+        </div>
+        <input type="range" min="1" max="10" value="5" id="editPredPhysSlider" oninput="document.getElementById('editPredPhysVal').textContent=this.value">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <span class="slider-label">Mental Focus</span>
+          <span><span class="slider-value" id="editPredMentalVal">5</span><span class="slider-sublabel">/ 10</span></span>
+        </div>
+        <input type="range" min="1" max="10" value="5" id="editPredMentalSlider" oninput="document.getElementById('editPredMentalVal').textContent=this.value">
+      </div>
+
+      <div class="divider"></div>
+      <div style="font-family:'Fraunces',serif;font-size:14px;font-style:italic;color:var(--text-dim);margin-bottom:12px">Actual</div>
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <span class="slider-label">Dread</span>
+          <span><span class="slider-value" id="editActDreadVal">5</span><span class="slider-sublabel">/ 10</span></span>
+        </div>
+        <input type="range" min="1" max="10" value="5" id="editActDreadSlider" oninput="document.getElementById('editActDreadVal').textContent=this.value">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <span class="slider-label">Physical Toll</span>
+          <span><span class="slider-value" id="editActPhysVal">5</span><span class="slider-sublabel">/ 10</span></span>
+        </div>
+        <input type="range" min="1" max="10" value="5" id="editActPhysSlider" oninput="document.getElementById('editActPhysVal').textContent=this.value">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <span class="slider-label">Mental Focus</span>
+          <span><span class="slider-value" id="editActMentalVal">5</span><span class="slider-sublabel">/ 10</span></span>
+        </div>
+        <input type="range" min="1" max="10" value="5" id="editActMentalSlider" oninput="document.getElementById('editActMentalVal').textContent=this.value">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <span class="slider-label">How did you feel after?</span>
+          <span><span class="slider-value" id="editAfterFeelVal">5</span><span class="slider-sublabel">/ 10</span></span>
+        </div>
+        <input type="range" min="1" max="10" value="5" id="editAfterFeelSlider" oninput="document.getElementById('editAfterFeelVal').textContent=this.value">
+      </div>
+
+      <div class="note-field">
+        <label>Notes</label>
+        <textarea id="editNotes" placeholder="Any context or observations..."></textarea>
+      </div>
+
+      <div class="btn-row" style="margin-top:20px">
+        <button class="btn btn-danger" style="flex:1" onclick="confirmDeleteEntry()">Delete</button>
+        <button class="btn btn-primary" style="flex:1" onclick="saveEditedEntry()">Save</button>
+      </div>
+    </div>
+  </div>
+
   <!-- AVERAGES SCREEN -->
   <div id="screen-averages" style="display:none">
     <button class="back-btn" onclick="showScreen('home')">← Home</button>
@@ -1017,7 +1101,7 @@ window.onload = function() {
 // SCREEN NAVIGATION
 // =====================
 function showScreen(name) {
-  ['home','track','history','averages'].forEach(s => {
+  ['home','track','history','averages','edit'].forEach(s => {
     document.getElementById('screen-' + s).style.display = s === name ? 'block' : 'none';
   });
 }
@@ -1582,8 +1666,111 @@ function renderHistory() {
         ${gapChip}
       </div>
       ${entry.notes ? `<div style="font-size:10px;color:var(--text-dimmer);margin-top:8px;font-style:italic">"${entry.notes}"</div>` : ''}
+      <button class="btn btn-secondary" style="margin-top:10px;font-size:10px;padding:6px 12px" onclick="openEditEntry(${entry.timestamp})">Edit</button>
     </div>`;
   }).join('');
+}
+
+// =====================
+// EDIT / DELETE ENTRY
+// =====================
+let editingTimestamp = null;
+
+function openEditEntry(timestamp) {
+  const history = getHistory();
+  const entry = history.find(e => e.timestamp === timestamp);
+  if (!entry) return;
+
+  editingTimestamp = timestamp;
+
+  document.getElementById('editTaskName').value = entry.name;
+
+  // Predicted
+  const pd = entry.predicted || {};
+  document.getElementById('editPredDreadSlider').value = pd.dread || 5;
+  document.getElementById('editPredDreadVal').textContent = pd.dread || 5;
+  document.getElementById('editPredPhysSlider').value = pd.phys || 5;
+  document.getElementById('editPredPhysVal').textContent = pd.phys || 5;
+  document.getElementById('editPredMentalSlider').value = pd.mental || 5;
+  document.getElementById('editPredMentalVal').textContent = pd.mental || 5;
+
+  // Actual
+  const ac = entry.actual || {};
+  document.getElementById('editActDreadSlider').value = ac.dread || 5;
+  document.getElementById('editActDreadVal').textContent = ac.dread || 5;
+  document.getElementById('editActPhysSlider').value = ac.phys || 5;
+  document.getElementById('editActPhysVal').textContent = ac.phys || 5;
+  document.getElementById('editActMentalSlider').value = ac.mental || 5;
+  document.getElementById('editActMentalVal').textContent = ac.mental || 5;
+
+  document.getElementById('editAfterFeelSlider').value = entry.afterFeel || 5;
+  document.getElementById('editAfterFeelVal').textContent = entry.afterFeel || 5;
+  document.getElementById('editNotes').value = entry.notes || '';
+
+  showScreen('edit');
+}
+
+function saveEditedEntry() {
+  const history = getHistory();
+  const idx = history.findIndex(e => e.timestamp === editingTimestamp);
+  if (idx === -1) return;
+
+  const entry = history[idx];
+
+  const predDread = parseInt(document.getElementById('editPredDreadSlider').value);
+  const predPhys = parseInt(document.getElementById('editPredPhysSlider').value);
+  const predMental = parseInt(document.getElementById('editPredMentalSlider').value);
+  const actDread = parseInt(document.getElementById('editActDreadSlider').value);
+  const actPhys = parseInt(document.getElementById('editActPhysSlider').value);
+  const actMental = parseInt(document.getElementById('editActMentalSlider').value);
+  const afterFeel = parseInt(document.getElementById('editAfterFeelSlider').value);
+  const notes = document.getElementById('editNotes').value.trim();
+  const name = document.getElementById('editTaskName').value.trim() || entry.name;
+
+  const minutesElapsed = entry.elapsed / 60000;
+  const timeCost = (minutesElapsed / 30) * (entry.extenuating ? TIME_COST_EXTENUATING : TIME_COST_NORMAL);
+  const predictedCost = calcCost(predDread, predPhys, predMental, timeCost);
+  const actualCost = calcCost(actDread, actPhys, actMental, timeCost);
+  const gap = predictedCost - actualCost;
+
+  history[idx] = {
+    ...entry,
+    name,
+    predicted: { dread: predDread, phys: predPhys, mental: predMental },
+    actual: { dread: actDread, phys: actPhys, mental: actMental },
+    predictedCost,
+    actualCost,
+    gap,
+    afterFeel,
+    notes,
+  };
+
+  localStorage.setItem('fieldtracker_history', JSON.stringify(history));
+  saveTask(name);
+  updateTaskSuggestions();
+  showNotification('Entry saved');
+  showScreen('history');
+  renderHistory();
+  renderAverages();
+}
+
+function confirmDeleteEntry() {
+  showModal(
+    'Delete this entry?',
+    'This task will be permanently removed from your history and averages. This cannot be undone.',
+    [
+      { label: 'Delete', style: 'btn-danger', action: () => {
+        const history = getHistory().filter(e => e.timestamp !== editingTimestamp);
+        localStorage.setItem('fieldtracker_history', JSON.stringify(history));
+        closeModal();
+        showNotification('Entry deleted');
+        showScreen('history');
+        renderHistory();
+        renderAverages();
+      }},
+      { label: 'Cancel', style: 'btn-secondary', action: closeModal }
+    ]
+  );
 }
 
 // =====================
