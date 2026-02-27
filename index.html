@@ -1745,6 +1745,18 @@ function saveEditedEntry() {
     notes,
   };
 
+  // If entry is from today, adjust energy by the difference in actual cost
+  if (state.dayStarted) {
+    const entryDate = new Date(entry.timestamp).toDateString();
+    const today = new Date().toDateString();
+    if (entryDate === today) {
+      const costDiff = entry.actualCost - actualCost;
+      state.currentEnergy = Math.min(state.startEnergy, Math.max(0, state.currentEnergy + costDiff));
+      saveState();
+      updateEnergyDisplay();
+    }
+  }
+
   localStorage.setItem('fieldtracker_history', JSON.stringify(history));
   saveTask(name);
   updateTaskSuggestions();
@@ -1760,10 +1772,25 @@ function confirmDeleteEntry() {
     'This task will be permanently removed from your history and averages. This cannot be undone.',
     [
       { label: 'Delete', style: 'btn-danger', action: () => {
-        const history = getHistory().filter(e => e.timestamp !== editingTimestamp);
-        localStorage.setItem('fieldtracker_history', JSON.stringify(history));
+        const history = getHistory();
+        const entry = history.find(e => e.timestamp === editingTimestamp);
+
+        // If the entry is from today and a day is active, refund the energy cost
+        if (entry && state.dayStarted) {
+          const entryDate = new Date(entry.timestamp).toDateString();
+          const today = new Date().toDateString();
+          if (entryDate === today) {
+            state.currentEnergy = Math.min(state.startEnergy, state.currentEnergy + entry.actualCost);
+            state.tasksCompleted = Math.max(0, state.tasksCompleted - 1);
+            saveState();
+            updateEnergyDisplay();
+          }
+        }
+
+        const newHistory = history.filter(e => e.timestamp !== editingTimestamp);
+        localStorage.setItem('fieldtracker_history', JSON.stringify(newHistory));
         closeModal();
-        showNotification('Entry deleted');
+        showNotification('Entry deleted — points refunded');
         showScreen('history');
         renderHistory();
         renderAverages();
